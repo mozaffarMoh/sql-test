@@ -1,7 +1,35 @@
 // routes/orders.js
 const express = require("express");
 const router = express.Router();
-const db = require("../database/database");
+const orderRepo = require("../repositories/orderRepository");
+
+router.get("/", async (req, res) => {
+  const orders = await orderRepo.getAll();
+  res.json(orders);
+});
+
+router.get("/:id", async (req, res) => {
+  const order = await orderRepo.getById(req.params.id);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+
+  const items = await orderRepo.getItemsByOrderId(req.params.id);
+  const total = items.reduce((sum, item) => sum + parseFloat(item.subtotal), 0);
+
+  res.json({ order, items, total });
+});
+
+router.post("/", async (req, res) => {
+  const { customer_id, items } = req.body;
+
+  if (!customer_id || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "customer_id and items array are required" });
+  }
+
+  const orderId = await orderRepo.create(customer_id, items);
+  res.status(201).json({ order_id: orderId, message: "Order created" });
+});
+
+module.exports = router;
 
 // ─────────────────────────────────────────────
 // GET /orders

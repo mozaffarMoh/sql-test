@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model authors {
+  id         Int     @id
+  name       String
+  country    String?
+  birth_year Int?
+  books      books[]
+}
+
+model books {
+  id             Int           @id
+  title          String
+  author_id      Int
+  genre          String?
+  price          Float         @db.Real
+  published_year Int?
+  authors        authors       @relation(fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  order_items    order_items[]
+}
+
+model customers {
+  id     Int      @id
+  name   String
+  email  String   @unique
+  city   String?
+  orders orders[]
+}
+
+model order_items {
+  id       Int    @id
+  order_id Int
+  book_id  Int
+  quantity Int    @default(1)
+  books    books  @relation(fields: [book_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orders   orders @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model orders {
+  id          Int           @id
+  customer_id Int
+  order_date  String
+  order_items order_items[]
+  customers   customers     @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
