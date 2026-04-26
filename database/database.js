@@ -1,19 +1,23 @@
 // database.js
 // ─────────────────────────────────────────────
-// Opens a single connection to bookstore.db and
+// Creates a PostgreSQL connection pool and
 // exports it so every route file can reuse it.
-// better-sqlite3 is synchronous — no callbacks
-// or promises needed, which makes the code simple.
+// pg uses async/await — all queries return Promises.
 
-const Database = require("better-sqlite3");
-const path = require("path");
+require("dotenv").config();
+const { Pool } = require("pg");
 
-// The .db file lives in the same folder as this file
-const DB_PATH = path.join(__dirname, "bookstore.db");
+const db = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
 
-const db = new Database(DB_PATH);
-
-// Enable foreign key enforcement (off by default in SQLite)
-db.pragma("foreign_keys = ON");
+// Test the connection on startup
+db.connect()
+  .then(() => console.log("Connected to PostgreSQL"))
+  .catch((err) => console.error("Database connection failed:", err.message));
 
 module.exports = db;

@@ -8,20 +8,15 @@ const db = require("../database/database");
 // Returns all books with their author name
 // SQL used: SELECT with JOIN
 // ─────────────────────────────────────────────
-router.get("/", (req, res) => {
-  const books = db
-    .prepare(
-      `
+router.get("/", async (req, res) => {
+  const { rows } = await db.query(`
     SELECT b.id, b.title, b.genre, b.price, b.published_year,
            a.name AS author
     FROM books b
     JOIN authors a ON b.author_id = a.id
     ORDER BY b.title
-  `,
-    )
-    .all();
-
-  res.json(books);
+  `);
+  res.json(rows);
 });
 
 // ─────────────────────────────────────────────
@@ -29,49 +24,46 @@ router.get("/", (req, res) => {
 // Returns one book by its ID
 // SQL used: SELECT with WHERE
 // ─────────────────────────────────────────────
-router.get("/:id", (req, res) => {
-  const book = db
-    .prepare(
-      `
+router.get("/:id", async (req, res) => {
+  const { rows } = await db.query(
+    `
     SELECT b.id, b.title, b.genre, b.price, b.published_year,
            a.name AS author, a.country AS author_country
     FROM books b
     JOIN authors a ON b.author_id = a.id
-    WHERE b.id = ?
-  `,
-    )
-    .get(req.params.id); // .get() returns one row or undefined
+    WHERE b.id = $1
+    `,
+    [req.params.id],
+  );
 
-  if (!book) {
+  if (rows.length === 0) {
     return res.status(404).json({ error: "Book not found" });
   }
 
-  res.json(book);
+  res.json(rows[0]);
 });
 
 // ─────────────────────────────────────────────
 // POST /books
 // Add a new book
-// SQL used: INSERT INTO
+// SQL used: INSERT INTO ... RETURNING
 // Body: { title, author_id, genre, price, published_year }
 // ─────────────────────────────────────────────
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const { title, author_id, genre, price, published_year } = req.body;
 
   if (!title || !author_id || !price) {
     return res.status(400).json({ error: "title, author_id and price are required" });
   }
 
-  const result = db
-    .prepare(
-      `
-    INSERT INTO books (title, author_id, genre, price, published_year)
-    VALUES (?, ?, ?, ?, ?)
-  `,
-    )
-    .run(title, author_id, genre, price, published_year);
+  const { rows } = await db.query(
+    `INSERT INTO books (title, author_id, genre, price, published_year)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id`,
+    [title, author_id, genre, price, published_year],
+  );
 
-  res.status(201).json({ id: result.lastInsertRowid, message: "Book created" });
+  res.status(201).json({ id: rows[0].id, message: "Book created" });
 });
 
 // ─────────────────────────────────────────────
@@ -80,21 +72,18 @@ router.post("/", (req, res) => {
 // SQL used: UPDATE ... SET ... WHERE
 // Body: { price, genre }
 // ─────────────────────────────────────────────
-router.put("/:id", (req, res) => {
+router.put("/:id", async (req, res) => {
   const { price, genre } = req.body;
 
-  const result = db
-    .prepare(
-      `
-    UPDATE books
-    SET price = COALESCE(?, price),
-        genre = COALESCE(?, genre)
-    WHERE id = ?
-  `,
-    )
-    .run(price, genre, req.params.id);
+  const { rowCount } = await db.query(
+    `UPDATE books
+     SET price = COALESCE($1, price),
+         genre = COALESCE($2, genre)
+     WHERE id = $3`,
+    [price, genre, req.params.id],
+  );
 
-  if (result.changes === 0) {
+  if (rowCount === 0) {
     return res.status(404).json({ error: "Book not found" });
   }
 
@@ -106,10 +95,10 @@ router.put("/:id", (req, res) => {
 // Remove a book
 // SQL used: DELETE FROM ... WHERE
 // ─────────────────────────────────────────────
-router.delete("/:id", (req, res) => {
-  const result = db.prepare("DELETE FROM books WHERE id = ?").run(req.params.id);
+router.delete("/:id", async (req, res) => {
+  const { rowCount } = await db.query("DELETE FROM books WHERE id = $1", [req.params.id]);
 
-  if (result.changes === 0) {
+  if (rowCount === 0) {
     return res.status(404).json({ error: "Book not found" });
   }
 
